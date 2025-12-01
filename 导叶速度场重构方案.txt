@@ -1,0 +1,136 @@
+椭圆流场案例关键数据要素详细分类表
+1. 几何结构数据 (Geometry Structure)
+数据项	维度	物理意义	椭圆流场值	导叶案例对应建议
+graph.pos	[N, 2]	节点坐标位置	椭圆表面(x,y)坐标	由于是环形的导叶流场，采用极坐标表示，r,cos,sin,(使用sin，cos是为了其连连续性）
+graph.edge_index	[2, E]	节点连接关系	环状连接(前后邻居)	这一项根据提供的三角网格拓扑来做
+graph.edge_attr	[E, 2]	边的相对位置	[dx, dy]相对向量	导叶流域网格相对位置
+节点数 N	~2000	网格分辨率	椭圆表面节点	导叶流域网格节点数根据实际输入来确定
+边数 E	~4000	连接关系数	2*N (双向环状)	根据导叶网格拓扑确定
+
+2. 节点特征 (Node Features)
+2.1 核心输入特征 (动态变化)
+数据项	维度	物理意义	椭圆流场值	导叶案例对应建议
+graph.field_r	[N, 1]	当前噪声场	加噪压力场	加噪的目标物理场(速度)
+
+
+2.2 条件节点特征 (固定不变)
+数据项	维度	物理意义	椭圆流场值	导叶案例对应建议
+graph.glob	[N, 1]	全局流动参数	雷诺数Re∈[500,1000]              在导叶中暂不使用
+graph.loc[:,0]	[N, 1]	局部距离特征1	到椭圆底部距离	导叶叶片数不止一个，使用到最近壁面的距离表示
+graph.loc[:,1]	[N, 1]	局部距离特征2	到椭圆顶部距离	导叶中不使用
+graph.omega[:,0]	[N, 1]	内部流场节点	bound∈{0,1,3}	导叶内部节点，0表示流道节点、1表示压力面边界层节点、2表示吸力面边界层节点
+graph.omega[:,1]	[N, 1]	入口边界节点	bound=2	                导叶进口边界点3、导叶出口边界点4
+graph.omega[:,2]	[N, 1]	壁面边界节点	bound=4	                导叶壁面压力侧节点5、导叶壁面吸力侧节点6
+                                                                                                                
+3. 边特征 (Edge Features)
+数据项	维度	物理意义	椭圆流场值	导叶案例对应建议
+graph.edge_attr[:,0]	[E, 1]	x方向相对位置	x_j - x_i	                                                        导叶网格x向距离
+graph.edge_attr[:,1]	[E, 1]	y方向相对位置	y_j - y_i	                                                        导叶网格y向距离
+graph.edge_cond	[E, 1]	流动方向投影	自由流速度cos(θ)	主流方向投影/流动方向角   暂不使用
+
+
+
+4. 物理约束 (Physical Constraints)
+约束类型	实现方式	椭圆流场物理意义	导叶案例对应建议
+边界条件类型	graph.bound	0:内部, 1:周期, 2:入口, 3:出口, 4:壁面	0:内部, 1:入口, 2:出口, 3:导叶壁面
+Dirichlet边界	dirichlet_mask	固定压力值节点	                                无固定边界节点
+壁面条件	omega[:,2]=1.0	无滑移边界条件	                                                导叶型面无滑移/无渗透条件                         
+入口条件	omega[:,1]=1.0	固定来流条件	                                                导叶进口条件未定
+出口条件	omega[:,0]=1.0	自由出流条件	                                                导叶出口条件未定
+5. 重构对象 (Reconstruction Target)
+属性	椭圆流场设置	导叶案例建议
+物理场类型	压力系数场 Cp	                                                               速度标量场
+场维度	1维标量场	                                                                                               一维标量场
+时间演化	非定常压力变化	                                                                              导叶内部非定常流动演化
+物理范围	[-1.05, 0.84] (归一化)	                                                                              根据具体物理量确定归一化范围
+
+
+6. 引导参数 (Guidance Parameters)
+6.1 数据预处理参数
+参数	椭圆流场值	物理意义	导叶案例调整建议
+压力缩放	vmin=-1.05, vmax=0.84	压力系数范围	                              根据目标物理场范围调整
+雷诺数缩放	vmin=500, vmax=1000	Re范围	                              不使用
+距离缩放	vmin=2, vmax=3.5	特征距离	                                                              根据导叶几何尺寸调整
+边缩放	r=0.02	椭圆特征尺度	                                                              根据导叶特征尺度调整
+6.2 模型架构参数
+参数	椭圆流场值	意义	导叶案例建议
+in_node_features	1	输入场维度	                                             速度场
+cond_node_features	3	条件特征维度	                                             根据导叶条件特征数量调整
+cond_edge_features	3	边特征维度	                                             根据导叶网格特征调整
+fnns_width	128	网络宽度	                                                             根据问题复杂度调整
+depths	[2,2,2,2]	网络深度	                                                                             根据导叶流场复杂度调整
+
+
+6.3 扩散过程参数
+参数	椭圆流场值	意义	导叶案例建议
+num_steps	1000	扩散步数	                                                            可保持不变或调整
+schedule_type	'linear'	噪声调度	                                                            可尝试'cosine'
+learnable_variance	True	方差学习	                                                            保持不变
+
+7. 关键修改对照表
+7.1 几何数据替换
+# 椭圆流场 → 导叶流场
+graph.pos = ellipse_surface_nodes          →  guide_vane_flow_field_nodes
+graph.edge_index = ellipse_ring_connect    →  guide_vane_mesh_connectivity
+graph.edge_attr = ellipse_relative_pos     →  guide_vane_mesh_relative_pos
+
+
+7.2 特征数据替换
+# 全局特征
+graph.glob = reynolds_number               →  inlet_condition_parameters  # (前面提到的参数)
+
+# 局部特征  
+graph.loc[:,0] = distance_to_bottom        →  distance_to_blade
+graph.loc[:,1] = distance_to_top                 （不使用）
+
+# 边界类型
+graph.bound = ellipse_boundary_type        →  guide_vane_boundary_type
+# 0:内部流场 1:周期边界 2:入口 3:出口 4:壁面 → 0:内部, 1:入口, 2:出口, 3:导叶壁面
+
+
+7.3 物理约束调整
+# 壁面条件
+wall_condition = no_slip_on_ellipse        →  no_slip_on_guide_vane_surface
+
+# 入口条件  
+inlet_condition = uniform_inlet_velocity    →  无入口条件
+
+# 出口条件
+outlet_condition = pressure_outlet         →  无出口条件
+
+在导叶案例中，设置一定数量的锚点（高分辨率数据下采样得到），锚点的数据是高保真的，与最终的重构目标一致。以此来作为物理约束，实现类似高分辨率重构的效果。
+
+7.4 重构目标调整
+# 重构场类型
+target_field = pressure_coefficient        →  velocity_magnitude
+
+# 时间演化
+time_evolution = unsteady_pressure         →  unsteady_velocity_in_guide_vane_passage
+
+
+
+8. 导叶案例实施建议
+8.1 数据准备优先级
+几何网格: 导叶流域的结构化/非结构化网格                  导叶案例提供三角网格拓扑文件[M,3]（文件名：sta_data_mesh.npy）
+边界条件: 明确定义入口、出口、壁面、周期边界         需要创建一个识别的函数，基于给定的节点坐标和网格拓扑，识别环形流场的进口、出口、叶片、压力面、吸力面
+物理参数: 进口条件(速度、压力、湍流参数)                 进出口条件未知，在导叶案例中改为，通过数据集里面的高分辨率数据下采样确定数据锚点的位置信息和速度信息。（下采样率暂定为4、16、32）
+目标数据: CFD仿真或实验测量的流场数据                   提供的数据文件（文件名sta_dataset.npy），数据格式为四个维度（B:案例，T：时间，N：节点序号，V：0:x、1：y、2：速度标量、后续数据暂时不用）
+
+
+8.2 特征工程重点
+局部几何特征: 到型面压力面/吸力面距离
+流动参数: 锚点信息等
+边界条件编码: 不同边界类型的one-hot编码
+网格连接关系: 反映导叶流道拓扑特征
+8.3 模型调整建议
+输入维度: 根据重构场的数量调整in_node_features
+条件特征: 增加导叶特有的条件特征
+网络深度: 导叶流场更复杂，可适当增加网络深度
+训练数据: 需要覆盖不同工况和几何参数的导叶流场数据
+
+
+注意，初步的修改版本不要将模型设置的太大，主要先保证可以正常运行，再逐步增大模型
+
+
+
+

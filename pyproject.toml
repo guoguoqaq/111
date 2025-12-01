@@ -1,0 +1,33 @@
+[build-system]
+requires=["flit_core >=3.2,<4"]
+build-backend="flit_core.buildapi"
+
+[project]
+name="dgn4cfd"
+version="0.0.1"
+authors=[
+    {name="Mario Lino"},
+]
+description="Diffusion Graph Nets for Computational Fluid Dynamics applications"
+readme="README.md"
+requires-python=">=3.10"
+dependencies=[
+    "tqdm",
+    "numpy",
+    "scipy",
+    "h5py",
+    "matplotlib",
+    "h5py",
+    "torch_geometric",
+    "tensorboard",
+    "jupyterlab",
+    "vtk",
+    "bayesian-torch",
+    "pot",
+    "torch_cluster",
+]
+
+[project.optional-dependencies]
+doc = [
+    "spinx",
+]
