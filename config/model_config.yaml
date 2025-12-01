@@ -1,0 +1,195 @@
+# 导叶流场扩散模型配置文件
+
+# 数据配置
+data:
+  dataset_path: "sta_dataset.npy"
+  mesh_path: "sta_data_mesh.npy"
+  train_ratio: 0.8
+  val_ratio: 0.1
+  test_ratio: 0.1
+
+  # 数据预处理
+  normalize_features: true
+  normalize_targets: true
+  augment_data: false
+  augmentation_factor: 1.0
+
+# 模型架构配置
+model:
+  # 基础架构
+  input_dim: 8          # 输入特征维度 (x, y, polar coords, wall distance, etc.)
+  hidden_dim: 128       # 隐藏层维度
+  output_dim: 2         # 输出维度 (u, v velocity components)
+  num_layers: 4         # GNN层数
+  num_heads: 8          # 多头注意力头数
+  edge_dim: 6           # 边特征维度
+
+  # 时间嵌入
+  time_embedding_dim: 128
+  use_positional_encoding: true
+
+  # 激活函数和正则化
+  activation: "silu"    # 激活函数: relu, gelu, silu, swish
+  dropout: 0.1          # Dropout概率
+  layer_norm: true      # 是否使用层归一化
+  residual_connection: true  # 是否使用残差连接
+
+  # 物理约束
+  use_physical_constraints: true
+  physics_loss_weight: 0.1
+  continuity_loss_weight: 0.05
+  boundary_loss_weight: 0.15
+  energy_loss_weight: 0.02
+
+# 扩散过程配置
+diffusion:
+  # 基础参数
+  num_steps: 1000               # 扩散步数
+  beta_start: 0.0001           # 噪声调度起始值
+  beta_end: 0.02               # 噪声调度结束值
+  schedule_type: "linear"      # 调度类型: linear, cosine, sqrt
+
+  # 高级设置
+  learnable_variance: false    # 是否学习方差
+  importance_sampling: true    # 是否使用重要性采样
+  self_condition: false        # 是否使用自条件
+
+  # 采样参数
+  sampling_type: "ddpm"        # 采样类型: ddpm, ddim
+  clip_sample: true            # 是否裁剪采样
+  clip_value: 1.0              # 裁剪值
+
+# 训练配置
+training:
+  # 基础训练参数
+  batch_size: 8               # 批次大小
+  num_epochs: 150             # 训练轮数
+  learning_rate: 1e-4         # 学习率
+  weight_decay: 1e-5          # 权重衰减 (L2正则化)
+
+  # 优化器设置
+  optimizer: "adam"           # 优化器: adam, adamw, sgd
+  betas: [0.9, 0.999]        # Adam beta参数
+  eps: 1e-8                  # Adam epsilon参数
+
+  # 学习率调度
+  scheduler: "reduce_on_plateau"  # 调度器类型
+  scheduler_patience: 20     # 调度器耐心值
+  scheduler_factor: 0.5      # 学习率衰减因子
+  min_lr: 1e-7               # 最小学习率
+
+  # 早停
+  early_stopping: true       # 是否启用早停
+  patience: 30               # 早停耐心值
+  min_delta: 1e-6            # 最小改进阈值
+
+  # 梯度处理
+  gradient_clip_value: 1.0   # 梯度裁剪值
+  gradient_clip_norm: true   # 是否使用范数裁剪
+
+  # 混合精度训练
+  use_amp: false             # 是否使用自动混合精度
+  amp_init_scale: 65536.0    # AMP初始化缩放因子
+
+  # 检查点保存
+  save_every: 10             # 每隔多少轮保存检查点
+  validate_every: 5          # 每隔多少轮验证
+  max_checkpoints: 5         # 最大检查点数量
+
+# 推理配置
+inference:
+  # 采样参数
+  num_inference_steps: 50     # 推理时的扩散步数
+  num_samples: 10            # 不确定性估计的采样数量
+  batch_size_inference: 4    # 推理批次大小
+
+  # 后处理
+  apply_physics_constraints: true    # 推理后是否应用物理约束
+  smooth_output: false              # 是否对输出进行平滑
+  smooth_sigma: 1.0                 # 平滑核标准差
+
+  # 不确定性处理
+  compute_uncertainty: true         # 是否计算不确定性
+  uncertainty_method: "std"         # 不确定性计算方法: std, percentile, entropy
+
+# 特征工程配置
+features:
+  # 节点特征
+  use_cartesian_coords: true      # 是否使用笛卡尔坐标 (x, y)
+  use_polar_coords: true          # 是否使用极坐标 (r, theta)
+  use_wall_distance: true         # 是否使用壁面距离
+  use_curvature: false            # 是否使用曲率特征
+  use_blade_side: true            # 是否使用叶片侧面信息
+
+  # 边特征
+  use_edge_length: true           # 是否使用边长度
+  use_edge_direction: true        # 是否使用边方向
+  use_relative_position: true     # 是否使用相对位置
+
+  # 时间特征
+  use_temporal_features: false    # 是否使用时间特征 (对于稳态流场通常不需要)
+  time_window: 3                  # 时间窗口大小
+
+  # 高级特征
+  use_vorticity: false            # 是否使用涡量特征
+  use_stream_function: false      # 是否使用流函数特征
+
+# 网格处理配置
+mesh:
+  # 图构建
+  k_neighbors: 6                 # K近邻图的K值
+  connectivity_threshold: 0.1     # 连接性阈值
+
+  # 多尺度处理
+  use_multiscale: false          # 是否使用多尺度网格
+  num_scales: 3                  # 多尺度层数
+  scale_factor: 0.5              # 尺度因子
+
+  # 边界处理
+  boundary_handling: "mask"      # 边界处理方法: mask, padding, reflection
+  boundary_value: 0.0            # 边界值
+
+# 日志和可视化配置
+logging:
+  # TensorBoard
+  log_dir: "runs/guide_vane_diffusion"
+  log_every: 10                  # 每隔多少步记录日志
+  log_gradients: false           # 是否记录梯度
+
+  # 可视化
+  plot_every: 20                 # 每隔多少轮生成可视化图
+  save_predictions: true         # 是否保存预测结果
+  save_attention_maps: false     # 是否保存注意力图
+
+  # 指标记录
+  track_metrics: [
+    "loss", "mse_loss", "physics_loss",
+    "val_loss", "val_mse", "learning_rate"
+  ]
+
+# 硬件配置
+hardware:
+  # 设备设置
+  device: "auto"                 # 设备: auto, cpu, cuda
+  num_workers: 4                 # 数据加载器工作进程数
+  pin_memory: true               # 是否使用pin_memory
+
+  # 内存优化
+  gradient_checkpointing: false  # 是否使用梯度检查点
+  mixed_precision: false         # 是否使用混合精度
+  efficient_attention: false     # 是否使用高效注意力
+
+# 实验配置
+experiment:
+  # 实验标识
+  name: "guide_vane_diffusion_v1"
+  description: "导叶流场扩散重构模型实验"
+  tags: ["diffusion", "gnn", "cfd", "flow_reconstruction"]
+
+  # 可重现性
+  seed: 42                       # 随机种子
+  deterministic: false           # 是否使用确定性算法
+
+  # 调试
+  debug: false                   # 是否为调试模式
+  overfit_single_batch: false    # 是否在单个批次上过拟合测试
