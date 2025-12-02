@@ -384,18 +384,18 @@ def custom_ldgn_train_loop(model, train_settings, train_loader, val_loader):
 
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--gpu', type=int, default=0)
+    argparser.add_argument('--gpu', type=int, default=1)
     argparser.add_argument('--name', type=str, default='LDGN_GuideVane_Final')
     args = argparser.parse_args()
 
     # 路径配置
-    ae_checkpoint_path = 'checkpoints_ae/VGAE_GuideVane_2.5D_epoch_1060.pt'
+    ae_checkpoint_path = 'checkpoints_ae/VGAE_GuideVane_2.5D_best.pt'
     stats_path         = 'checkpoints_ae/scaler_stats.pt'
     dataset_path       = 'sta_dataset_2.5D.npy'
     
     # 实验参数
     config = {
-        'batch_size': 60,   # 
+        'batch_size': 50,   # 
         'epochs': 5000,
         'lr': 1e-4,
         'val_case_idx': -1, 
@@ -476,7 +476,7 @@ if __name__ == "__main__":
     # 7. Build LDGN
     ldgn_config = {
         'in_node_features': 8, 'cond_node_features': 128, 'cond_edge_features': 128,
-        'depths': [8], 'fnns_width': 128, 'aggr': 'sum', 'dropout': 0.1, 'dim': 3,
+        'depths': [6], 'fnns_width': 128, 'aggr': 'sum', 'dropout': 0.05, 'dim': 3,
     }
     
     diffusion_process = dgn.nn.diffusion.DiffusionProcess(num_steps=1000, schedule_type='cosine')
