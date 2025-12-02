@@ -447,3 +447,101 @@ if __name__ == "__main__":
         stats_to_save=scaler_stats # 传入统计量以便保存到 checkpoint
     )
     print("Training finished.")
+    # ========================================
+    # 🔬 Latent Space 质量检查
+    # ========================================
+    print("\n" + "="*80)
+    print("🔬 Latent Space Quality Check")
+    print("="*80)
+    
+    model.eval()
+    latent_stats = {
+        'mean': [],
+        'std': [],
+        'min': [],
+        'max': []
+    }
+    
+    with torch.no_grad():
+        for i, graph in enumerate(val_loader):
+            if i >= 10:  # 只检查前10个验证样本
+                break
+            
+            graph = graph.to(device)
+            
+            # 编码到潜在空间
+            z_latent, mean, logvar = model.node_encoder(
+                graph,
+                graph.field,
+                # ... 需要传入 c_latent_list 和 e_latent_list
+                # 简化版: 直接用 encode
+            )
+            
+            # 完整编码
+            outputs = model.encode(graph, graph.target)
+            z = outputs[0]  # [N, latent_dim]
+            
+            latent_stats['mean'].append(z.mean().item())
+            latent_stats['std'].append(z.std().item())
+            latent_stats['min'].append(z.min().item())
+            latent_stats['max'].append(z.max().item())
+    
+    # 统计分析
+    import numpy as np
+    for key in latent_stats:
+        latent_stats[key] = np.array(latent_stats[key])
+    
+    print(f"\n📊 Latent Space Statistics (Validation Set):")
+    print(f"   Mean: {latent_stats['mean'].mean():.4f} ± {latent_stats['mean'].std():.4f}")
+    print(f"   Std:  {latent_stats['std'].mean():.4f} ± {latent_stats['std'].std():.4f}")
+    print(f"   Range: [{latent_stats['min'].mean():.4f}, {latent_stats['max'].mean():.4f}]")
+    
+    # 健康度判断
+    mean_avg = latent_stats['mean'].mean()
+    std_avg = latent_stats['std'].mean()
+    
+    print(f"\n✅ Health Check:")
+    if abs(mean_avg) < 0.5 and 0.5 < std_avg < 1.5:
+        print("   ✓ Latent distribution is healthy (close to N(0,1))")
+    else:
+        print(f"   ✗ WARNING: Latent distribution deviates from N(0,1)")
+        print(f"     Consider adjusting KL regularization weight")
+    
+    # 可视化 (可选)
+    if latent_stats['mean'].size > 0:
+        import matplotlib.pyplot as plt
+        
+        fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+        
+        axes[0, 0].hist(latent_stats['mean'], bins=20, edgecolor='black')
+        axes[0, 0].axvline(0, color='red', linestyle='--', label='Target (0)')
+        axes[0, 0].set_title('Latent Mean Distribution')
+        axes[0, 0].legend()
+        
+        axes[0, 1].hist(latent_stats['std'], bins=20, edgecolor='black')
+        axes[0, 1].axvline(1, color='red', linestyle='--', label='Target (1)')
+        axes[0, 1].set_title('Latent Std Distribution')
+        axes[0, 1].legend()
+        
+        axes[1, 0].scatter(latent_stats['mean'], latent_stats['std'], alpha=0.6)
+        axes[1, 0].axhline(1, color='red', linestyle='--', alpha=0.5)
+        axes[1, 0].axvline(0, color='red', linestyle='--', alpha=0.5)
+        axes[1, 0].set_xlabel('Mean')
+        axes[1, 0].set_ylabel('Std')
+        axes[1, 0].set_title('Mean vs Std')
+        axes[1, 0].grid(True, alpha=0.3)
+        
+        # 单个样本的潜在向量分布
+        with torch.no_grad():
+            sample_graph = next(iter(val_loader)).to(device)
+            sample_z = model.encode(sample_graph, sample_graph.target)[0]
+            axes[1, 1].hist(sample_z.cpu().flatten().numpy(), bins=50, edgecolor='black', alpha=0.7)
+            axes[1, 1].set_title('Single Sample Latent Distribution')
+            axes[1, 1].set_xlabel('Latent Value')
+        
+        plt.tight_layout()
+        plt.savefig(f'{train_settings["folder"]}/latent_space_quality.png', dpi=150)
+        print(f"\n📈 Visualization saved to {train_settings['folder']}/latent_space_quality.png")
+        plt.close()
+    
+    print("="*80 + "\n")
